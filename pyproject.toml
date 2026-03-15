@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "anymodel"
+name = "anymodel-py"
 version = "0.1.0"
 description = "OpenRouter-compatible LLM router with unified batch support. Route requests across OpenAI, Anthropic, and Google with a single API."
 readme = "README.md"
