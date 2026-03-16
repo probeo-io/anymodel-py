@@ -13,6 +13,7 @@ from anymodel.providers._anthropic import create_anthropic_adapter
 from anymodel.providers._custom import create_custom_adapter
 from anymodel.providers._google import create_google_adapter
 from anymodel.providers._openai import create_openai_adapter
+from anymodel.providers._perplexity import create_perplexity_adapter
 from anymodel.providers._registry import ProviderRegistry
 from anymodel.utils._fs_io import configure_fs_io
 from anymodel.utils._generation_stats import GenerationStatsStore
@@ -25,7 +26,6 @@ _BUILTIN_PROVIDERS = [
     {"name": "xai", "base_url": "https://api.x.ai/v1", "env_var": "XAI_API_KEY"},
     {"name": "together", "base_url": "https://api.together.xyz/v1", "env_var": "TOGETHER_API_KEY"},
     {"name": "fireworks", "base_url": "https://api.fireworks.ai/inference/v1", "env_var": "FIREWORKS_API_KEY"},
-    {"name": "perplexity", "base_url": "https://api.perplexity.ai", "env_var": "PERPLEXITY_API_KEY"},
 ]
 
 
@@ -201,6 +201,11 @@ class AnyModel:
         google_key = self._config.get("google", {}).get("api_key") or os.environ.get("GOOGLE_API_KEY")
         if google_key:
             self._registry.register("google", create_google_adapter(google_key))
+
+        # Perplexity
+        perplexity_key = self._config.get("perplexity", {}).get("api_key") or os.environ.get("PERPLEXITY_API_KEY")
+        if perplexity_key:
+            self._registry.register("perplexity", create_perplexity_adapter(perplexity_key))
 
         # Built-in OpenAI-compatible providers
         for p in _BUILTIN_PROVIDERS:

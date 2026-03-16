@@ -262,6 +262,7 @@ response = client.chat.completions.create(
 ## Also Available
 
 - **Node.js**: [`@probeo/anymodel`](https://github.com/probeo-io/anymodel) on npm
+- **Go**: [`anymodel-go`](https://github.com/probeo-io/anymodel-go)
 
 ## License
 
