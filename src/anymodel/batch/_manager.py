@@ -47,7 +47,8 @@ class BatchManager:
         model = request["model"]
         requests = request["requests"]
         parsed = parse_model_string(model, self._aliases)
-        adapter = self._get_native_adapter(model)
+        force_mode = request.get("batch_mode")
+        adapter = self._get_native_adapter(model) if force_mode != "concurrent" else None
 
         batch_id = generate_id("batch")
         now = datetime.now(timezone.utc).isoformat()

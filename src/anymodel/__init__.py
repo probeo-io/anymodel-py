@@ -26,7 +26,7 @@ from anymodel._types import (
 )
 from anymodel.utils._fs_io import configure_fs_io
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 __all__ = [
     "AnyModel",
