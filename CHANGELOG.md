@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-03-17
+
+### Changed
+
+- Concurrent batch processing now streams requests from disk instead of holding all in memory — safe for 10K+ request batches
+- Tasks created incrementally with concurrency gating instead of all-at-once, preventing memory spikes on large batches
+
 ## [0.3.0] - 2026-03-17
 
 ### Added

@@ -98,6 +98,16 @@ class BatchStore:
             return None
         return await read_json_queued(provider_path)
 
+    async def stream_requests(self, batch_id: str):
+        """Yield requests one at a time from JSONL (memory-efficient)."""
+        requests_path = str(Path(self._batch_dir(batch_id)) / "requests.jsonl")
+        if not await path_exists_queued(requests_path):
+            return
+        raw = await read_file_queued(requests_path)
+        for line in raw.split("\n"):
+            if line.strip():
+                yield json.loads(line)
+
     async def list_batches(self) -> list[str]:
         """List all batch IDs on disk."""
         await self._init()

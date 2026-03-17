@@ -74,8 +74,8 @@ class BatchManager:
         if adapter:
             await self._process_native_batch(batch, adapter, requests, request.get("options"))
         else:
-            # Fire off concurrent processing in the background
-            asyncio.create_task(self._process_concurrent_batch(batch, requests, request.get("options")))
+            # Fire off concurrent processing in the background — streams from disk
+            asyncio.create_task(self._process_concurrent_batch(batch, request.get("options")))
 
         return batch
 
@@ -253,28 +253,25 @@ class BatchManager:
     async def _process_concurrent_batch(
         self,
         batch: dict[str, Any],
-        requests: list[dict[str, Any]],
         options: dict[str, Any] | None,
     ) -> None:
-        """Process batch with concurrent requests."""
+        """Process batch with concurrent requests. Streams from disk."""
         batch["status"] = "processing"
         await self._store.update_meta(batch)
 
         semaphore = asyncio.Semaphore(self._concurrency)
+        active: set[asyncio.Task[None]] = set()
 
         async def process_one(req: dict[str, Any]) -> None:
             async with semaphore:
                 custom_id = req.get("custom_id", generate_id("req"))
                 try:
-                    # Build chat completion request
                     chat_request: dict[str, Any] = {
                         "model": batch["model"],
                         "messages": req["messages"],
                     }
-                    # Merge options
                     if options:
                         chat_request.update(options)
-                    # Per-request overrides
                     for key in ("max_tokens", "temperature", "top_p", "top_k", "stop",
                                 "response_format", "tools", "tool_choice"):
                         if key in req:
@@ -301,9 +298,25 @@ class BatchManager:
 
                 await self._store.update_meta(batch)
 
-        tasks = [asyncio.create_task(process_one(req)) for req in requests]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        # Stream requests from disk instead of holding all in memory
+        async for req in self._store.stream_requests(batch["id"]):
+            meta = await self._store.get_meta(batch["id"])
+            if meta and meta["status"] == "cancelled":
+                break
 
-        batch["status"] = "completed" if batch["failed"] < batch["total"] else "failed"
-        batch["completed_at"] = datetime.now(timezone.utc).isoformat()
-        await self._store.update_meta(batch)
+            # Wait for a slot if at concurrency limit
+            if len(active) >= self._concurrency:
+                done, active_set = await asyncio.wait(active, return_when=asyncio.FIRST_COMPLETED)
+                active = active_set
+
+            task = asyncio.create_task(process_one(req))
+            active.add(task)
+
+        if active:
+            await asyncio.wait(active)
+
+        batch = await self._store.get_meta(batch["id"]) or batch
+        if batch["status"] != "cancelled":
+            batch["status"] = "completed" if batch["failed"] < batch["total"] else "failed"
+            batch["completed_at"] = datetime.now(timezone.utc).isoformat()
+            await self._store.update_meta(batch)
