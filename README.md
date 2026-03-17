@@ -70,6 +70,18 @@ Set the env var and go. Models are auto-discovered from each provider's API.
 | Perplexity | `PERPLEXITY_API_KEY` | `perplexity/sonar-pro` |
 | Ollama | `OLLAMA_BASE_URL` | `ollama/llama3.3` |
 
+### Flex Pricing (OpenAI)
+
+Get 50% off OpenAI requests with flexible latency:
+
+```python
+response = await client.chat.completions.create(
+    model="openai/gpt-4o",
+    messages=[{"role": "user", "content": "Hello!"}],
+    service_tier="flex",
+)
+```
+
 ## Fallback Routing
 
 Try multiple models in order. If one fails, the next is attempted:
@@ -114,7 +126,7 @@ for call in response["choices"][0]["message"].get("tool_calls", []):
 
 ## Batch Processing
 
-Process many requests with native provider batch APIs or concurrent fallback.
+Process many requests with native provider batch APIs or concurrent fallback. OpenAI, Anthropic, and Google batches are processed server-side — OpenAI at 50% cost, Anthropic with async processing for up to 10K requests, Google at 50% cost via `batchGenerateContent`. Other providers fall back to concurrent execution automatically.
 
 ### Submit and wait
 
@@ -157,6 +169,10 @@ all_batches = await client.batches.list()
 await client.batches.cancel("batch-abc123")
 ```
 
+### Automatic max_tokens
+
+When `max_tokens` isn't set on a batch request, anymodel automatically calculates a safe value per-request based on the estimated input size and the model's context window. This prevents truncated responses and context overflow errors without requiring you to hand-tune each request in a large batch.
+
 ### Batch configuration
 
 ```python
@@ -187,6 +203,7 @@ client = AnyModel({
         "temperature": 0.7,
         "max_tokens": 4096,
         "retries": 2,
+        "timeout": 120,  # HTTP timeout in seconds (default: 120 = 2 min, flex: 600 = 10 min)
     },
 })
 

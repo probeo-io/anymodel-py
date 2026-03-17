@@ -11,6 +11,7 @@ import httpx
 
 from anymodel._types import AnyModelError
 from anymodel.utils._id import generate_id
+from anymodel.utils._timeout import get_default_timeout
 
 ANTHROPIC_API_BASE = "https://api.anthropic.com/v1"
 ANTHROPIC_VERSION = "2023-06-01"
@@ -69,7 +70,7 @@ class AnthropicAdapter:
                     "x-api-key": self._api_key,
                     "anthropic-version": ANTHROPIC_VERSION,
                 },
-                timeout=120.0,
+                timeout=get_default_timeout(),
             )
         return self._client
 

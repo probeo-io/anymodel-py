@@ -9,13 +9,14 @@ from typing import Any
 import httpx
 
 from anymodel._types import AnyModelError
+from anymodel.utils._timeout import get_default_timeout, get_flex_timeout
 
 OPENAI_API_BASE = "https://api.openai.com/v1"
 
 SUPPORTED_PARAMS = frozenset({
     "temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty",
     "seed", "stop", "stream", "logprobs", "top_logprobs", "response_format",
-    "tools", "tool_choice", "user", "logit_bias",
+    "tools", "tool_choice", "user", "logit_bias", "service_tier",
 })
 
 
@@ -39,7 +40,7 @@ class OpenAIAdapter:
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {self._api_key}",
                 },
-                timeout=120.0,
+                timeout=get_default_timeout(),
             )
         return self._client
 
@@ -71,12 +72,16 @@ class OpenAIAdapter:
 
     async def _make_request(
         self, path: str, body: dict[str, Any] | None = None, method: str = "POST",
+        timeout: float | None = None,
     ) -> httpx.Response:
         client = self._get_client()
+        kwargs: dict[str, Any] = {}
+        if timeout is not None:
+            kwargs["timeout"] = timeout
         if method == "GET":
-            res = await client.get(path)
+            res = await client.get(path, **kwargs)
         else:
-            res = await client.post(path, json=body)
+            res = await client.post(path, json=body, **kwargs)
 
         if res.status_code >= 400:
             try:
@@ -95,19 +100,27 @@ class OpenAIAdapter:
             )
         return res
 
+    def _request_timeout(self, request: dict[str, Any]) -> float | None:
+        """Return a per-request timeout override for flex requests."""
+        if request.get("service_tier") == "flex":
+            return get_flex_timeout()
+        return None
+
     async def send_request(self, request: dict[str, Any]) -> dict[str, Any]:
         """Send a non-streaming chat completion request."""
         body = self._build_request_body(request)
-        res = await self._make_request("/chat/completions", body)
+        timeout = self._request_timeout(request)
+        res = await self._make_request("/chat/completions", body, timeout=timeout)
         data = res.json()
         return self._translate_response(data)
 
     async def send_streaming_request(self, request: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Send a streaming chat completion request."""
         body = self._build_request_body({**request, "stream": True})
+        timeout = self._request_timeout(request)
         client = self._get_client()
         req = client.build_request("POST", "/chat/completions", json=body)
-        res = await client.send(req, stream=True)
+        res = await client.send(req, stream=True, timeout=timeout)
 
         if res.status_code >= 400:
             error_text = await res.aread()

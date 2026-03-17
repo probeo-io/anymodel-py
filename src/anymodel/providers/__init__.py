@@ -1,8 +1,11 @@
 from anymodel.providers._adapter import BatchAdapter, NativeBatchStatus, ProviderAdapter
 from anymodel.providers._anthropic import AnthropicAdapter, create_anthropic_adapter
+from anymodel.providers._anthropic_batch import AnthropicBatchAdapter, create_anthropic_batch_adapter
 from anymodel.providers._custom import CustomAdapter, create_custom_adapter
 from anymodel.providers._google import GoogleAdapter, create_google_adapter
+from anymodel.providers._google_batch import GoogleBatchAdapter, create_google_batch_adapter
 from anymodel.providers._openai import OpenAIAdapter, create_openai_adapter
+from anymodel.providers._openai_batch import OpenAIBatchAdapter, create_openai_batch_adapter
 from anymodel.providers._perplexity import PerplexityAdapter, create_perplexity_adapter
 from anymodel.providers._registry import ProviderRegistry
 
@@ -13,10 +16,16 @@ __all__ = [
     "ProviderRegistry",
     "OpenAIAdapter",
     "create_openai_adapter",
+    "OpenAIBatchAdapter",
+    "create_openai_batch_adapter",
     "AnthropicAdapter",
     "create_anthropic_adapter",
+    "AnthropicBatchAdapter",
+    "create_anthropic_batch_adapter",
     "GoogleAdapter",
     "create_google_adapter",
+    "GoogleBatchAdapter",
+    "create_google_batch_adapter",
     "PerplexityAdapter",
     "create_perplexity_adapter",
     "CustomAdapter",

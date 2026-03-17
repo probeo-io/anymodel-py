@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from anymodel._types import AnyModelError
+from anymodel.utils._timeout import get_default_timeout
 
 PERPLEXITY_API_BASE = "https://api.perplexity.ai"
 
@@ -48,7 +49,7 @@ class PerplexityAdapter:
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {self._api_key}",
                 },
-                timeout=120.0,
+                timeout=get_default_timeout(),
             )
         return self._client
 

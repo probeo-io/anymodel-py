@@ -11,6 +11,7 @@ import httpx
 
 from anymodel._types import AnyModelError
 from anymodel.utils._id import generate_id
+from anymodel.utils._timeout import get_default_timeout
 
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -61,7 +62,7 @@ class GoogleAdapter:
             self._client = httpx.AsyncClient(
                 base_url=GEMINI_API_BASE,
                 headers={"Content-Type": "application/json"},
-                timeout=120.0,
+                timeout=get_default_timeout(),
             )
         return self._client
 
@@ -348,7 +349,7 @@ class GoogleAdapter:
         return param in SUPPORTED_PARAMS
 
     def supports_batch(self) -> bool:
-        return False
+        return True
 
     def translate_error(self, error: Exception) -> dict[str, Any]:
         if isinstance(error, AnyModelError):

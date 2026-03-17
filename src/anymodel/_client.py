@@ -10,13 +10,17 @@ from anymodel._config import resolve_config
 from anymodel._router import Router
 from anymodel.batch._manager import BatchManager
 from anymodel.providers._anthropic import create_anthropic_adapter
+from anymodel.providers._anthropic_batch import create_anthropic_batch_adapter
 from anymodel.providers._custom import create_custom_adapter
 from anymodel.providers._google import create_google_adapter
+from anymodel.providers._google_batch import create_google_batch_adapter
 from anymodel.providers._openai import create_openai_adapter
+from anymodel.providers._openai_batch import create_openai_batch_adapter
 from anymodel.providers._perplexity import create_perplexity_adapter
 from anymodel.providers._registry import ProviderRegistry
 from anymodel.utils._fs_io import configure_fs_io
 from anymodel.utils._generation_stats import GenerationStatsStore
+from anymodel.utils._timeout import set_default_timeout
 
 # Built-in OpenAI-compatible providers
 _BUILTIN_PROVIDERS = [
@@ -153,6 +157,10 @@ class AnyModel:
         self._registry = ProviderRegistry()
         self._stats_store = GenerationStatsStore()
 
+        # Configure default HTTP timeout
+        timeout = self._config.get("defaults", {}).get("timeout", 120.0)
+        set_default_timeout(timeout)
+
         # Configure IO concurrency
         io_config = self._config.get("io")
         if io_config:
@@ -178,6 +186,7 @@ class AnyModel:
         )
 
         self._register_providers()
+        self._register_batch_adapters()
 
         # Namespace objects
         self.chat = _Chat(self)
@@ -238,3 +247,17 @@ class AnyModel:
                     cfg.get("models"),
                 ),
             )
+
+    def _register_batch_adapters(self) -> None:
+        """Register native batch adapters for providers that support them."""
+        openai_key = self._config.get("openai", {}).get("api_key") or os.environ.get("OPENAI_API_KEY")
+        if openai_key:
+            self._batch_manager.register_batch_adapter("openai", create_openai_batch_adapter(openai_key))
+
+        anthropic_key = self._config.get("anthropic", {}).get("api_key") or os.environ.get("ANTHROPIC_API_KEY")
+        if anthropic_key:
+            self._batch_manager.register_batch_adapter("anthropic", create_anthropic_batch_adapter(anthropic_key))
+
+        google_key = self._config.get("google", {}).get("api_key") or os.environ.get("GOOGLE_API_KEY")
+        if google_key:
+            self._batch_manager.register_batch_adapter("google", create_google_batch_adapter(google_key))
