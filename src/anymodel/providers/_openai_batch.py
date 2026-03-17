@@ -58,6 +58,7 @@ def _build_jsonl(model: str, requests: list[dict[str, Any]]) -> str:
             "model": model,
             "messages": req.get("messages", []),
         }
+        # service_tier intentionally omitted — native batch already gets 50% off
         for key in ("max_tokens", "temperature", "top_p", "stop",
                      "response_format", "tools", "tool_choice"):
             if key in req:

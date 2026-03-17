@@ -273,7 +273,7 @@ class BatchManager:
                     if options:
                         chat_request.update(options)
                     for key in ("max_tokens", "temperature", "top_p", "top_k", "stop",
-                                "response_format", "tools", "tool_choice"):
+                                "response_format", "tools", "tool_choice", "service_tier"):
                         if key in req:
                             chat_request[key] = req[key]
 
