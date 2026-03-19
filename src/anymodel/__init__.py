@@ -26,12 +26,31 @@ from anymodel._types import (
 )
 from anymodel.utils._fs_io import configure_fs_io
 
-__version__ = "0.3.3"
+try:
+    from anymodel.generated.pricing import (
+        PRICING_AS_OF,
+        calculate_cost,
+        get_model_pricing,
+    )
+except ImportError:
+    PRICING_AS_OF: str = ""  # type: ignore[no-redef]
+
+    def get_model_pricing(model_id: str):  # type: ignore[misc]
+        return None
+
+    def calculate_cost(model_id: str, prompt_tokens: int, completion_tokens: int) -> float:  # type: ignore[misc]
+        return 0.0
+
+__version__ = "0.4.0"
 
 __all__ = [
     "AnyModel",
     "AnyModelError",
     "configure_fs_io",
+    # Pricing
+    "calculate_cost",
+    "get_model_pricing",
+    "PRICING_AS_OF",
     # Types
     "BatchCreateRequest",
     "BatchMode",

@@ -13,6 +13,12 @@ from anymodel.providers._adapter import BatchAdapter
 from anymodel.utils._id import generate_id
 from anymodel.utils._model_parser import parse_model_string
 
+try:
+    from anymodel.generated.pricing import calculate_cost as _calculate_cost
+except ImportError:
+    def _calculate_cost(model_id: str, prompt_tokens: int, completion_tokens: int) -> float:  # type: ignore[misc]
+        return 0.0
+
 
 class BatchManager:
     """Manages batch processing with native and concurrent paths."""
@@ -118,12 +124,17 @@ class BatchManager:
 
             if batch["status"] in ("completed", "failed", "cancelled"):
                 results = await self._store.get_results(batch_id)
-                usage = {"total_prompt_tokens": 0, "total_completion_tokens": 0, "estimated_cost": 0}
+                usage = {"total_prompt_tokens": 0, "total_completion_tokens": 0, "estimated_cost": 0.0}
                 for r in results:
                     resp = r.get("response")
                     if resp and resp.get("usage"):
                         usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                         usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
+                usage["estimated_cost"] = _calculate_cost(
+                    batch["model"],
+                    usage["total_prompt_tokens"],
+                    usage["total_completion_tokens"],
+                )
                 return {
                     "id": batch_id,
                     "status": batch["status"],
@@ -154,12 +165,17 @@ class BatchManager:
             raise AnyModelError(404, f"Batch {batch_id} not found.")
 
         result_items = await self._store.get_results(batch_id)
-        usage = {"total_prompt_tokens": 0, "total_completion_tokens": 0, "estimated_cost": 0}
+        usage = {"total_prompt_tokens": 0, "total_completion_tokens": 0, "estimated_cost": 0.0}
         for r in result_items:
             resp = r.get("response")
             if resp and resp.get("usage"):
                 usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                 usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
+        usage["estimated_cost"] = _calculate_cost(
+            batch["model"],
+            usage["total_prompt_tokens"],
+            usage["total_completion_tokens"],
+        )
 
         return {
             "id": batch_id,
