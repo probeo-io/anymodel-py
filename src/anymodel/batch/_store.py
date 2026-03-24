@@ -65,6 +65,15 @@ class BatchStore:
             "\n".join(lines) + "\n",
         )
 
+    async def append_request(self, batch_id: str, request: dict[str, Any]) -> None:
+        """Append a single request to requests.jsonl (used by BatchBuilder for incremental adds)."""
+        batch_dir = self._batch_dir(batch_id)
+        await ensure_dir(batch_dir)
+        await append_file_queued(
+            str(Path(batch_dir) / "requests.jsonl"),
+            json.dumps(request) + "\n",
+        )
+
     async def append_result(self, batch_id: str, result: dict[str, Any]) -> None:
         """Append a single result to the results file."""
         await append_file_queued(

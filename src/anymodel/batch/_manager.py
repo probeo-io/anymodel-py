@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
@@ -38,6 +39,10 @@ class BatchManager:
         self._default_poll_interval = poll_interval
         self._aliases = aliases or {}
         self._batch_adapters: dict[str, BatchAdapter] = {}
+
+    def get_store(self) -> BatchStore:
+        """Expose the store for use by BatchBuilder."""
+        return self._store
 
     def register_batch_adapter(self, provider_name: str, adapter: BatchAdapter) -> None:
         """Register a native batch adapter for a provider."""
@@ -103,9 +108,15 @@ class BatchManager:
         *,
         interval: float | None = None,
         on_progress: Callable[[dict[str, Any]], None] | None = None,
+        log_to_console: bool | None = None,
     ) -> dict[str, Any]:
         """Poll a batch until completion."""
         poll_interval = interval or self._default_poll_interval
+
+        # Resolve console logging: explicit param > env var
+        if log_to_console is None:
+            env_val = os.environ.get("ANYMODEL_BATCH_POLL_LOG", "").strip().lower()
+            log_to_console = env_val in ("1", "true", "yes")
 
         while True:
             batch = await self._store.get_meta(batch_id)
@@ -121,6 +132,13 @@ class BatchManager:
 
             if on_progress:
                 on_progress(batch)
+
+            if log_to_console:
+                print(
+                    f"[anymodel][batch.poll] id={batch['id']} status={batch['status']}"
+                    f" mode={batch['batch_mode']} progress={batch['completed']}/{batch['total']}"
+                    f" failed={batch['failed']}"
+                )
 
             if batch["status"] in ("completed", "failed", "cancelled"):
                 results = await self._store.get_results(batch_id)

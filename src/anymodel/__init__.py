@@ -1,6 +1,7 @@
 """anymodel — OpenRouter-compatible LLM router with unified batch support."""
 
 from anymodel._client import AnyModel
+from anymodel.batch._builder import BatchBuilder
 from anymodel._types import (
     AnyModelError,
     BatchCreateRequest,
@@ -41,11 +42,12 @@ except ImportError:
     def calculate_cost(model_id: str, prompt_tokens: int, completion_tokens: int) -> float:  # type: ignore[misc]
         return 0.0
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "AnyModel",
     "AnyModelError",
+    "BatchBuilder",
     "configure_fs_io",
     # Pricing
     "calculate_cost",

@@ -8,6 +8,7 @@ from typing import Any, Literal, overload
 
 from anymodel._config import resolve_config
 from anymodel._router import Router
+from anymodel.batch._builder import BatchBuilder
 from anymodel.batch._manager import BatchManager
 from anymodel.providers._anthropic import create_anthropic_adapter
 from anymodel.providers._anthropic_batch import create_anthropic_batch_adapter
@@ -103,6 +104,10 @@ class _Batches:
 
     def __init__(self, client: AnyModel) -> None:
         self._client = client
+
+    def open(self, config: dict[str, Any]) -> BatchBuilder:
+        """Open a new batch builder for incremental prompt addition."""
+        return BatchBuilder(config, self._client._batch_manager.get_store(), self._client._batch_manager)
 
     async def create(self, request: dict[str, Any]) -> dict[str, Any]:
         """Create a batch (fire-and-forget for native, background for concurrent)."""
