@@ -37,8 +37,8 @@ class BatchBuilder:
     """
 
     def __init__(self, config: dict[str, Any], store: Any, manager: Any) -> None:
-        from anymodel.batch._store import BatchStore
         from anymodel.batch._manager import BatchManager
+        from anymodel.batch._store import BatchStore
 
         self._batch_id: str = generate_id("batch")
         self._config: dict[str, Any] = config
@@ -57,7 +57,7 @@ class BatchBuilder:
         """Number of prompts added so far."""
         return self._count
 
-    def add(self, content: str | list[dict[str, Any]]) -> "BatchBuilder":
+    def add(self, content: str | list[dict[str, Any]]) -> BatchBuilder:
         """
         Add a prompt to the batch. Written to disk immediately.
 
@@ -169,7 +169,7 @@ class BatchBuilder:
         raw = await self._manager.results(self._batch_id)
         return await self._transform_results(raw)
 
-    def retry(self, failed: list[dict[str, Any]]) -> "BatchBuilder":
+    def retry(self, failed: list[dict[str, Any]]) -> BatchBuilder:
         """
         Create a new batch builder pre-loaded with the failed items from a previous batch.
         Call submit() on the returned builder to retry.

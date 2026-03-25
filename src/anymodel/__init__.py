@@ -1,7 +1,6 @@
 """anymodel — OpenRouter-compatible LLM router with unified batch support."""
 
 from anymodel._client import AnyModel
-from anymodel.batch._builder import BatchBuilder
 from anymodel._types import (
     AnyModelError,
     BatchCreateRequest,
@@ -25,6 +24,7 @@ from anymodel._types import (
     ToolChoice,
     Usage,
 )
+from anymodel.batch._builder import BatchBuilder
 from anymodel.utils._fs_io import configure_fs_io
 
 try:

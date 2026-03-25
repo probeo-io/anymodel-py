@@ -4,9 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
-
 # Date this pricing data was fetched
 PRICING_AS_OF: str = "2026-03-19T17:35:15.060672+00:00"
 
@@ -342,7 +339,7 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
 }
 
 
-def get_model_pricing(model_id: str) -> Optional[dict[str, float]]:
+def get_model_pricing(model_id: str) -> dict[str, float] | None:
     """
     Look up pricing for a model. Tries exact match first,
     then falls back to prefix matching for versioned models.
