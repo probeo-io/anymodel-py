@@ -169,6 +169,73 @@ all_batches = await client.batches.list()
 await client.batches.cancel("batch-abc123")
 ```
 
+### BatchBuilder API
+
+An ergonomic interface for building batches — just pass strings, and anymodel handles IDs, system prompt injection, and provider-specific formatting:
+
+```python
+batch = client.batches.open(
+    model="anthropic/claude-sonnet-4-6",
+    system="You are an expert.",
+)
+
+batch.add("What is an LLC?")
+batch.add("How do I dissolve an LLC?")
+
+await batch.submit()
+results = await batch.poll()
+
+print(results.succeeded)  # successful responses with per-item costs
+print(results.failed)     # failed items
+print(results.usage)      # aggregate usage and estimated_cost
+
+# Retry failed items
+retry_batch = batch.retry(results.failed)
+await retry_batch.submit()
+retry_results = await retry_batch.poll()
+```
+
+### Batch mode
+
+Force concurrent execution instead of native batch APIs (useful when you want flex pricing on individual requests):
+
+```python
+results = await client.batches.create_and_poll({
+    "model": "openai/gpt-4o",
+    "batch_mode": "concurrent",  # skip native batch, run as individual requests
+    "requests": [
+        {"custom_id": "req-1", "messages": [{"role": "user", "content": "Hello"}]},
+    ],
+})
+```
+
+### Service tier on batch requests
+
+Use flex pricing on concurrent batches for 50% cost savings:
+
+```python
+results = await client.batches.create_and_poll({
+    "model": "openai/gpt-4o",
+    "batch_mode": "concurrent",
+    "service_tier": "flex",  # flex pricing on each concurrent request
+    "requests": [
+        {"custom_id": "req-1", "messages": [{"role": "user", "content": "Hello"}]},
+    ],
+})
+```
+
+### Poll logging
+
+Enable console logging during batch polling to monitor progress:
+
+```python
+# Per-call option
+results = await client.batches.create_and_poll(request, log_to_console=True)
+
+# Or enable globally via environment variable
+# ANYMODEL_BATCH_POLL_LOG=1
+```
+
 ### Automatic max_tokens
 
 When `max_tokens` isn't set on a batch request, anymodel automatically calculates a safe value per-request based on the estimated input size and the model's context window. This prevents truncated responses and context overflow errors without requiring you to hand-tune each request in a large batch.
@@ -188,6 +255,33 @@ client = AnyModel({
         "write_concurrency": 15,         # concurrent file writes (default: 10)
     },
 })
+```
+
+## Generation Stats
+
+```python
+response = await client.chat.completions.create(...)
+stats = client.generation.get(response["id"])
+print(stats["latency"], stats["tokens_prompt"], stats["tokens_completion"])
+print(stats["total_cost"])  # auto-calculated from bundled pricing data
+```
+
+### Auto Pricing / Cost Calculation
+
+Pricing for 323 models is baked in at build time from OpenRouter — always current as of last publish. Costs are calculated automatically from token usage with no configuration needed.
+
+```python
+# Per-request cost on GenerationStats
+stats = client.generation.get(response["id"])
+print(stats["total_cost"])  # e.g. 0.0023
+
+# Batch-level cost on BatchUsageSummary
+results = await client.batches.create_and_poll(request)
+print(results["usage"]["estimated_cost"])  # total across all requests
+
+# Native batch pricing is automatically 50% off
+# Utility functions also exported
+from anymodel import calculate_cost, get_model_pricing, PRICING_AS_OF
 ```
 
 ## Configuration
