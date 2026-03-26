@@ -148,11 +148,13 @@ class BatchManager:
                     if resp and resp.get("usage"):
                         usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                         usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
+                # Native batch APIs (OpenAI, Anthropic, Google) are 50% off list price
+                batch_discount = 0.5 if batch.get("batch_mode") == "native" else 1.0
                 usage["estimated_cost"] = _calculate_cost(
                     batch["model"],
                     usage["total_prompt_tokens"],
                     usage["total_completion_tokens"],
-                )
+                ) * batch_discount
                 return {
                     "id": batch_id,
                     "status": batch["status"],
@@ -189,11 +191,12 @@ class BatchManager:
             if resp and resp.get("usage"):
                 usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                 usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
+        batch_discount = 0.5 if batch.get("batch_mode") == "native" else 1.0
         usage["estimated_cost"] = _calculate_cost(
             batch["model"],
             usage["total_prompt_tokens"],
             usage["total_completion_tokens"],
-        )
+        ) * batch_discount
 
         return {
             "id": batch_id,
