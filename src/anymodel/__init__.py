@@ -42,7 +42,7 @@ except ImportError:
     def calculate_cost(model_id: str, prompt_tokens: int, completion_tokens: int) -> float:  # type: ignore[misc]
         return 0.0
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 __all__ = [
     "AnyModel",
