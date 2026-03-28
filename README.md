@@ -372,10 +372,14 @@ response = client.chat.completions.create(
 )
 ```
 
-## Also Available
+## See Also
 
-- **Node.js**: [`@probeo/anymodel`](https://github.com/probeo-io/anymodel) on npm
-- **Go**: [`anymodel-go`](https://github.com/probeo-io/anymodel-go)
+| Package | Description |
+|---|---|
+| [@probeo/anymodel](https://github.com/probeo-io/anymodel) | TypeScript version of this package |
+| [anymodel-go](https://github.com/probeo-io/anymodel-go) | Go version of this package |
+| [anyserp-py](https://github.com/probeo-io/anyserp-py) | Unified SERP API router for Python |
+| [workflow-py](https://github.com/probeo-io/workflow-py) | Stage-based pipeline engine for Python |
 
 ## License
 
