@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
-from anymodel._types import AnyModelError
 from anymodel._router import Router
+from anymodel._types import AnyModelError
 from anymodel.providers._registry import ProviderRegistry
 from anymodel.utils._id import generate_id
 

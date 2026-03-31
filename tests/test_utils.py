@@ -15,7 +15,6 @@ from anymodel.utils._id import generate_id
 from anymodel.utils._model_parser import parse_model_string
 from anymodel.utils._validate import validate_request
 
-
 # ─── generateId ─────────────────────────────────────────────────────────────
 
 def test_generates_gen_prefixed_ids() -> None:

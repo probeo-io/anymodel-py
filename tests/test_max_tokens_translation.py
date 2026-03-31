@@ -1,8 +1,8 @@
 """Tests for max_tokens -> max_completion_tokens translation."""
 
-from anymodel.providers._openai import OpenAIAdapter
 from anymodel.providers._anthropic import AnthropicAdapter
 from anymodel.providers._google import GoogleAdapter
+from anymodel.providers._openai import OpenAIAdapter
 
 
 def _base_request(model: str, max_tokens: int | None = None) -> dict:

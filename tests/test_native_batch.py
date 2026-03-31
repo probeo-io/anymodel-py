@@ -202,9 +202,7 @@ async def test_handles_native_batch_creation_failure(tmp_path: Path) -> None:
             ],
         })
 
-    # Batch should be marked as failed
-    meta = await manager.get(adapter.create_batch.call_args is not None and "batch" or "batch")
-    # Instead, retrieve via list
+    # Batch should be marked as failed — retrieve via list
     batches = await manager.list()
     assert len(batches) == 1
     assert batches[0]["status"] == "failed"
