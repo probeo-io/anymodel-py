@@ -11,6 +11,7 @@ from typing import Any
 from anymodel._types import AnyModelError
 from anymodel.batch._store import BatchStore
 from anymodel.providers._adapter import BatchAdapter
+from anymodel.utils._adaptive_concurrency import AdaptiveConcurrencyController
 from anymodel.utils._id import generate_id
 from anymodel.utils._model_parser import parse_model_string
 
@@ -29,13 +30,15 @@ class BatchManager:
         router: Any,
         *,
         dir: str | None = None,
-        concurrency: int = 5,
+        concurrency: int | str = 5,
+        concurrency_max: int | None = None,
         poll_interval: float = 5.0,
         aliases: dict[str, str] | None = None,
     ) -> None:
         self._store = BatchStore(dir)
         self._router = router
-        self._concurrency = concurrency
+        self._concurrency: int | str = concurrency
+        self._concurrency_max = concurrency_max
         self._default_poll_interval = poll_interval
         self._aliases = aliases or {}
         self._batch_adapters: dict[str, BatchAdapter] = {}
@@ -53,6 +56,20 @@ class BatchManager:
         parsed = parse_model_string(model, self._aliases)
         return self._batch_adapters.get(parsed.provider)
 
+    @staticmethod
+    def _batch_discount(batch: dict[str, Any]) -> float:
+        """Return the cost multiplier for a batch.
+
+        - native batches: 0.5 (50% off)
+        - concurrent + flex: 0.5
+        - concurrent + auto/None: 1.0
+        """
+        if batch.get("batch_mode") == "native":
+            return 0.5
+        if batch.get("service_tier") == "flex":
+            return 0.5
+        return 1.0
+
     async def create(self, request: dict[str, Any]) -> dict[str, Any]:
         """Create a batch. Routes to native or concurrent processing."""
         model = request["model"]
@@ -64,6 +81,12 @@ class BatchManager:
         batch_id = generate_id("batch")
         now = datetime.now(timezone.utc).isoformat()
         batch_mode = "native" if adapter else "concurrent"
+
+        # Resolve service_tier: options > first request item
+        options = request.get("options")
+        service_tier = (options or {}).get("service_tier")
+        if service_tier is None and requests:
+            service_tier = requests[0].get("service_tier")
 
         batch: dict[str, Any] = {
             "id": batch_id,
@@ -79,6 +102,8 @@ class BatchManager:
             "completed_at": None,
             "expires_at": None,
         }
+        if service_tier is not None:
+            batch["service_tier"] = service_tier
 
         await self._store.create(batch)
         await self._store.save_requests(batch_id, requests)
@@ -148,13 +173,11 @@ class BatchManager:
                     if resp and resp.get("usage"):
                         usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                         usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
-                # Native batch APIs (OpenAI, Anthropic, Google) are 50% off list price
-                batch_discount = 0.5 if batch.get("batch_mode") == "native" else 1.0
                 usage["estimated_cost"] = _calculate_cost(
                     batch["model"],
                     usage["total_prompt_tokens"],
                     usage["total_completion_tokens"],
-                ) * batch_discount
+                ) * self._batch_discount(batch)
                 return {
                     "id": batch_id,
                     "status": batch["status"],
@@ -191,12 +214,11 @@ class BatchManager:
             if resp and resp.get("usage"):
                 usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                 usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
-        batch_discount = 0.5 if batch.get("batch_mode") == "native" else 1.0
         usage["estimated_cost"] = _calculate_cost(
             batch["model"],
             usage["total_prompt_tokens"],
             usage["total_completion_tokens"],
-        ) * batch_discount
+        ) * self._batch_discount(batch)
 
         return {
             "id": batch_id,
@@ -288,6 +310,14 @@ class BatchManager:
 
         await self._store.update_meta(batch)
 
+    def _build_concurrency_controller(self) -> AdaptiveConcurrencyController | None:
+        """Build an adaptive concurrency controller if concurrency is 'auto'."""
+        if self._concurrency == "auto":
+            return AdaptiveConcurrencyController(
+                max=self._concurrency_max or 500,
+            )
+        return None
+
     async def _process_concurrent_batch(
         self,
         batch: dict[str, Any],
@@ -297,10 +327,18 @@ class BatchManager:
         batch["status"] = "processing"
         await self._store.update_meta(batch)
 
-        semaphore = asyncio.Semaphore(self._concurrency)
+        controller = self._build_concurrency_controller()
+        fixed_concurrency = self._concurrency if isinstance(self._concurrency, int) else 5
+        semaphore = asyncio.Semaphore(controller.max_concurrency if controller else fixed_concurrency)
         active: set[asyncio.Task[None]] = set()
 
         async def process_one(req: dict[str, Any]) -> None:
+            # Respect adaptive delay if controller is active
+            if controller:
+                delay = controller.get_delay()
+                if delay > 0:
+                    await asyncio.sleep(delay / 1000.0)
+
             async with semaphore:
                 custom_id = req.get("custom_id", generate_id("req"))
                 try:
@@ -315,7 +353,14 @@ class BatchManager:
                         if key in req:
                             chat_request[key] = req[key]
 
-                    result = await self._router.complete(chat_request)
+                    if controller and hasattr(self._router, "complete_with_meta"):
+                        result_with_meta = await self._router.complete_with_meta(chat_request)
+                        result = result_with_meta["completion"]
+                        controller.record_success(result_with_meta.get("meta"))
+                    else:
+                        result = await self._router.complete(chat_request)
+                        if controller:
+                            controller.record_success()
 
                     await self._store.append_result(batch["id"], {
                         "custom_id": custom_id,
@@ -324,6 +369,18 @@ class BatchManager:
                         "error": None,
                     })
                     batch["completed"] += 1
+                except AnyModelError as e:
+                    if controller and e.code == 429:
+                        retry_after = e.metadata.get("retry_after_ms") if e.metadata else None
+                        controller.record_throttle(retry_after)
+                    code = e.code
+                    await self._store.append_result(batch["id"], {
+                        "custom_id": custom_id,
+                        "status": "error",
+                        "response": None,
+                        "error": {"code": code, "message": str(e)},
+                    })
+                    batch["failed"] += 1
                 except Exception as e:
                     code = getattr(e, "code", 500)
                     await self._store.append_result(batch["id"], {
@@ -342,8 +399,9 @@ class BatchManager:
             if meta and meta["status"] == "cancelled":
                 break
 
-            # Wait for a slot if at concurrency limit
-            if len(active) >= self._concurrency:
+            # Update semaphore limit dynamically for adaptive mode
+            effective = controller.max_concurrency if controller else fixed_concurrency
+            if len(active) >= effective:
                 done, active_set = await asyncio.wait(active, return_when=asyncio.FIRST_COMPLETED)
                 active = active_set
 

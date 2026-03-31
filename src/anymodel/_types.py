@@ -155,6 +155,18 @@ class ChatCompletion(TypedDict):
     usage: Usage
 
 
+# ─── Response Meta ──────────────────────────────────────────────────────────
+
+
+class ResponseMeta(TypedDict):
+    headers: dict[str, str]
+
+
+class ChatCompletionWithMeta(TypedDict):
+    completion: ChatCompletion
+    meta: ResponseMeta
+
+
 # ─── Streaming ───────────────────────────────────────────────────────────────
 
 
@@ -267,7 +279,7 @@ class BatchCreateRequest(TypedDict, total=False):
     webhook: str
 
 
-class BatchObject(TypedDict):
+class BatchObject(TypedDict, total=False):
     id: str
     object: Literal["batch"]
     status: BatchStatus
@@ -280,6 +292,7 @@ class BatchObject(TypedDict):
     created_at: str
     completed_at: str | None
     expires_at: str | None
+    service_tier: str | None
 
 
 class BatchError(TypedDict):
@@ -338,6 +351,7 @@ class BatchConfig(TypedDict, total=False):
     dir: str
     poll_interval: float
     concurrency_fallback: int
+    concurrency_max: int
     retention_days: int
 
 

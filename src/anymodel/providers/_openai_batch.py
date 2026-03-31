@@ -10,6 +10,7 @@ import httpx
 
 from anymodel._types import AnyModelError
 from anymodel.providers._adapter import NativeBatchStatus
+from anymodel.providers._openai import _uses_max_completion_tokens
 from anymodel.utils._id import generate_id
 from anymodel.utils._timeout import get_default_timeout
 from anymodel.utils._token_estimate import resolve_max_tokens
@@ -66,6 +67,10 @@ def _build_jsonl(model: str, requests: list[dict[str, Any]]) -> str:
 
         if "max_tokens" not in body:
             body["max_tokens"] = resolve_max_tokens(model, req.get("messages", []))
+
+        # Translate max_tokens → max_completion_tokens for newer models
+        if "max_tokens" in body and _uses_max_completion_tokens(model):
+            body["max_completion_tokens"] = body.pop("max_tokens")
 
         lines.append(json.dumps({
             "custom_id": req.get("custom_id", f"request-{len(lines)}"),

@@ -211,8 +211,25 @@ class GoogleAdapter:
             },
         }
 
-    async def send_request(self, request: dict[str, Any]) -> dict[str, Any]:
-        """Send a non-streaming chat completion request."""
+    @staticmethod
+    def _extract_rate_limit_headers(res: httpx.Response) -> dict[str, str]:
+        """Extract rate-limit headers from an httpx response."""
+        _HEADERS = (
+            "x-ratelimit-remaining-requests",
+            "x-ratelimit-remaining-tokens",
+            "x-ratelimit-reset-requests",
+            "x-ratelimit-reset-tokens",
+            "retry-after",
+        )
+        headers: dict[str, str] = {}
+        for name in _HEADERS:
+            value = res.headers.get(name)
+            if value is not None:
+                headers[name] = value
+        return headers
+
+    async def _make_generate_request(self, request: dict[str, Any]) -> tuple[httpx.Response, str]:
+        """Send a generateContent request and return the raw response + model name."""
         model = request["model"]
         body = self._translate_request(request)
         client = self._get_client()
@@ -230,8 +247,20 @@ class GoogleAdapter:
                 msg or "Unknown Google error",
                 {"provider_name": "google", "raw": error_body},
             )
+        return res, model
 
+    async def send_request(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send a non-streaming chat completion request."""
+        res, model = await self._make_generate_request(request)
         return self._translate_response(res.json(), model)
+
+    async def send_request_with_meta(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send a request and return completion + response headers."""
+        res, model = await self._make_generate_request(request)
+        return {
+            "completion": self._translate_response(res.json(), model),
+            "meta": {"headers": self._extract_rate_limit_headers(res)},
+        }
 
     async def send_streaming_request(self, request: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Send a streaming chat completion request."""

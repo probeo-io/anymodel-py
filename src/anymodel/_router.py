@@ -74,6 +74,57 @@ class Router:
 
         return result
 
+    async def complete_with_meta(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Route a chat completion request and return ``{completion, meta}``."""
+        request = self._apply_defaults(request)
+        validate_request(request)
+
+        transforms = request.pop("transforms", None)
+        if transforms:
+            request["messages"] = apply_transforms(transforms, request["messages"])
+
+        parsed = parse_model_string(request["model"], self._aliases)
+        adapter = self._registry.get(parsed.provider)
+
+        clean_request = self._strip_unsupported(request, adapter)
+        clean_request["model"] = parsed.model
+
+        retries = self._defaults.get("retries", 2)
+        start = time.monotonic()
+
+        has_meta = hasattr(adapter, "send_request_with_meta") and callable(
+            getattr(adapter, "send_request_with_meta", None)
+        )
+
+        if has_meta:
+            result = await with_retry(
+                lambda: adapter.send_request_with_meta(clean_request),
+                max_retries=retries,
+            )
+        else:
+            completion = await with_retry(
+                lambda: adapter.send_request(clean_request),
+                max_retries=retries,
+            )
+            result = {"completion": completion, "meta": {"headers": {}}}
+
+        elapsed = time.monotonic() - start
+        completion_data = result["completion"]
+        self._record_stats(completion_data, parsed.provider, elapsed, streamed=False)
+
+        # Feed headers into rate limiter
+        headers = result.get("meta", {}).get("headers", {})
+        remaining = headers.get("x-ratelimit-remaining-requests")
+        retry_after = headers.get("retry-after")
+        if remaining is not None or retry_after is not None:
+            self._rate_limiter.record(
+                parsed.provider,
+                remaining=int(remaining) if remaining is not None else None,
+                retry_after=float(retry_after) if retry_after is not None else None,
+            )
+
+        return result
+
     async def stream(self, request: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Route a streaming chat completion request."""
         request = self._apply_defaults(request)

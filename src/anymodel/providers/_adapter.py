@@ -15,6 +15,14 @@ class ProviderAdapter(Protocol):
 
     async def send_request(self, request: dict[str, Any]) -> dict[str, Any]: ...
 
+    async def send_request_with_meta(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send a request and return ``{completion, meta}`` with response headers.
+
+        Optional — adapters that do not override this will have a default
+        implementation synthesised by the router.
+        """
+        ...
+
     async def send_streaming_request(self, request: dict[str, Any]) -> AsyncIterator[dict[str, Any]]: ...
 
     async def list_models(self) -> list[dict[str, Any]]: ...

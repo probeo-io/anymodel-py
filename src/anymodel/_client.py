@@ -186,6 +186,7 @@ class AnyModel:
             self._router,
             dir=batch_config.get("dir"),
             concurrency=batch_config.get("concurrency_fallback", 5),
+            concurrency_max=batch_config.get("concurrency_max"),
             poll_interval=batch_config.get("poll_interval", 5.0),
             aliases=self._config.get("aliases"),
         )

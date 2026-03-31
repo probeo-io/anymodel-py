@@ -14,10 +14,12 @@ from anymodel._types import (
     ChatCompletion,
     ChatCompletionChunk,
     ChatCompletionRequest,
+    ChatCompletionWithMeta,
     FinishReason,
     GenerationStats,
     Message,
     ModelInfo,
+    ResponseMeta,
     Role,
     Tool,
     ToolCall,
@@ -25,6 +27,7 @@ from anymodel._types import (
     Usage,
 )
 from anymodel.batch._builder import BatchBuilder
+from anymodel.utils._adaptive_concurrency import AdaptiveConcurrencyController
 from anymodel.utils._fs_io import configure_fs_io
 
 try:
@@ -45,6 +48,7 @@ except ImportError:
 __version__ = "0.5.1"
 
 __all__ = [
+    "AdaptiveConcurrencyController",
     "AnyModel",
     "AnyModelError",
     "BatchBuilder",
@@ -65,10 +69,12 @@ __all__ = [
     "ChatCompletion",
     "ChatCompletionChunk",
     "ChatCompletionRequest",
+    "ChatCompletionWithMeta",
     "FinishReason",
     "GenerationStats",
     "Message",
     "ModelInfo",
+    "ResponseMeta",
     "Role",
     "Tool",
     "ToolCall",

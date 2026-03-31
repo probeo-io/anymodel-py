@@ -186,8 +186,25 @@ class AnthropicAdapter:
             },
         }
 
-    async def send_request(self, request: dict[str, Any]) -> dict[str, Any]:
-        """Send a non-streaming chat completion request."""
+    @staticmethod
+    def _extract_rate_limit_headers(res: httpx.Response) -> dict[str, str]:
+        """Extract Anthropic rate-limit headers and normalize to x-ratelimit-* format."""
+        _HEADER_MAP = {
+            "anthropic-ratelimit-requests-remaining": "x-ratelimit-remaining-requests",
+            "anthropic-ratelimit-tokens-remaining": "x-ratelimit-remaining-tokens",
+            "anthropic-ratelimit-requests-reset": "x-ratelimit-reset-requests",
+            "anthropic-ratelimit-tokens-reset": "x-ratelimit-reset-tokens",
+            "retry-after": "retry-after",
+        }
+        headers: dict[str, str] = {}
+        for src, dst in _HEADER_MAP.items():
+            value = res.headers.get(src)
+            if value is not None:
+                headers[dst] = value
+        return headers
+
+    async def _make_request(self, request: dict[str, Any]) -> httpx.Response:
+        """Send a request and return the raw httpx response, raising on error."""
         body = self._translate_request(request)
         client = self._get_client()
         res = await client.post("/messages", json=body)
@@ -207,8 +224,20 @@ class AnthropicAdapter:
                 msg or "Unknown Anthropic error",
                 {"provider_name": "anthropic", "raw": error_body},
             )
+        return res
 
+    async def send_request(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send a non-streaming chat completion request."""
+        res = await self._make_request(request)
         return self._translate_response(res.json())
+
+    async def send_request_with_meta(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send a request and return completion + normalized response headers."""
+        res = await self._make_request(request)
+        return {
+            "completion": self._translate_response(res.json()),
+            "meta": {"headers": self._extract_rate_limit_headers(res)},
+        }
 
     async def send_streaming_request(self, request: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Send a streaming chat completion request."""

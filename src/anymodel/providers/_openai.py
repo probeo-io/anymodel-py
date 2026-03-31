@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -10,6 +11,31 @@ import httpx
 
 from anymodel._types import AnyModelError
 from anymodel.utils._timeout import get_default_timeout, get_flex_timeout
+
+_MAX_COMPLETION_TOKENS_RE = re.compile(r"^(o[1-9]|gpt-5|gpt-4o)")
+
+_RATE_LIMIT_HEADERS = (
+    "x-ratelimit-remaining-requests",
+    "x-ratelimit-remaining-tokens",
+    "x-ratelimit-reset-requests",
+    "x-ratelimit-reset-tokens",
+    "retry-after",
+)
+
+
+def _uses_max_completion_tokens(model: str) -> bool:
+    """Return True if *model* should use ``max_completion_tokens`` instead of ``max_tokens``."""
+    return bool(_MAX_COMPLETION_TOKENS_RE.search(model))
+
+
+def _extract_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
+    """Extract rate-limit headers from an httpx response."""
+    headers: dict[str, str] = {}
+    for name in _RATE_LIMIT_HEADERS:
+        value = response.headers.get(name)
+        if value is not None:
+            headers[name] = value
+    return headers
 
 OPENAI_API_BASE = "https://api.openai.com/v1"
 
@@ -68,6 +94,11 @@ class OpenAIAdapter:
         for param in SUPPORTED_PARAMS:
             if param in request:
                 body[param] = request[param]
+
+        # Translate max_tokens → max_completion_tokens for newer models
+        if "max_tokens" in body and _uses_max_completion_tokens(request["model"]):
+            body["max_completion_tokens"] = body.pop("max_tokens")
+
         return body
 
     async def _make_request(
@@ -113,6 +144,17 @@ class OpenAIAdapter:
         res = await self._make_request("/chat/completions", body, timeout=timeout)
         data = res.json()
         return self._translate_response(data)
+
+    async def send_request_with_meta(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send a request and return completion + response headers."""
+        body = self._build_request_body(request)
+        timeout = self._request_timeout(request)
+        res = await self._make_request("/chat/completions", body, timeout=timeout)
+        data = res.json()
+        return {
+            "completion": self._translate_response(data),
+            "meta": {"headers": _extract_rate_limit_headers(res)},
+        }
 
     async def send_streaming_request(self, request: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Send a streaming chat completion request."""

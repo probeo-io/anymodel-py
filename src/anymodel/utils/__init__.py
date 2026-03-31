@@ -1,3 +1,4 @@
+from anymodel.utils._adaptive_concurrency import AdaptiveConcurrencyController
 from anymodel.utils._fs_io import (
     append_file_queued,
     configure_fs_io,
@@ -19,6 +20,7 @@ from anymodel.utils._transforms import apply_transforms
 from anymodel.utils._validate import validate_request
 
 __all__ = [
+    "AdaptiveConcurrencyController",
     "generate_id",
     "ParsedModel",
     "parse_model_string",

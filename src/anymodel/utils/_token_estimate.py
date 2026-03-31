@@ -18,6 +18,7 @@ _MODEL_LIMITS: dict[str, tuple[int, int]] = {
     "o1": (200_000, 100_000),
     "o3": (200_000, 100_000),
     "o4-mini": (200_000, 100_000),
+    "gpt-5-mini": (1_047_576, 65_536),
     # Anthropic
     "claude-opus-4": (200_000, 32_768),
     "claude-sonnet-4": (200_000, 16_384),
