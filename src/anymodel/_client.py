@@ -19,6 +19,8 @@ from anymodel.providers._openai import create_openai_adapter
 from anymodel.providers._openai_batch import create_openai_batch_adapter
 from anymodel.providers._perplexity import create_perplexity_adapter
 from anymodel.providers._registry import ProviderRegistry
+from anymodel.providers._xai import create_xai_adapter
+from anymodel.providers._xai_batch import create_xai_batch_adapter
 from anymodel.utils._fs_io import configure_fs_io
 from anymodel.utils._generation_stats import GenerationStatsStore
 from anymodel.utils._timeout import set_default_timeout
@@ -28,7 +30,6 @@ _BUILTIN_PROVIDERS = [
     {"name": "mistral", "base_url": "https://api.mistral.ai/v1", "env_var": "MISTRAL_API_KEY"},
     {"name": "groq", "base_url": "https://api.groq.com/openai/v1", "env_var": "GROQ_API_KEY"},
     {"name": "deepseek", "base_url": "https://api.deepseek.com/v1", "env_var": "DEEPSEEK_API_KEY"},
-    {"name": "xai", "base_url": "https://api.x.ai/v1", "env_var": "XAI_API_KEY"},
     {"name": "together", "base_url": "https://api.together.xyz/v1", "env_var": "TOGETHER_API_KEY"},
     {"name": "fireworks", "base_url": "https://api.fireworks.ai/inference/v1", "env_var": "FIREWORKS_API_KEY"},
 ]
@@ -222,6 +223,11 @@ class AnyModel:
         if perplexity_key:
             self._registry.register("perplexity", create_perplexity_adapter(perplexity_key))
 
+        # xAI — native adapter with Responses web_search support
+        xai_key = self._config.get("xai", {}).get("api_key") or os.environ.get("XAI_API_KEY")
+        if xai_key:
+            self._registry.register("xai", create_xai_adapter(xai_key))
+
         # Built-in OpenAI-compatible providers
         for p in _BUILTIN_PROVIDERS:
             provider_config = self._config.get(p["name"], {})
@@ -267,3 +273,7 @@ class AnyModel:
         google_key = self._config.get("google", {}).get("api_key") or os.environ.get("GOOGLE_API_KEY")
         if google_key:
             self._batch_manager.register_batch_adapter("google", create_google_batch_adapter(google_key))
+
+        xai_key = self._config.get("xai", {}).get("api_key") or os.environ.get("XAI_API_KEY")
+        if xai_key:
+            self._batch_manager.register_batch_adapter("xai", create_xai_batch_adapter(xai_key))

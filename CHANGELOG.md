@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-08-06
+
+### Added
+
+- **xAI provider** — dedicated `xai` adapter (`XAI_API_KEY`) for Grok models, with citation passthrough and Responses-API routing when a `web_search` tool is present. Native batch support via a separate `xai` batch adapter. Previously xAI only worked through the generic OpenAI-compatible custom adapter with stub model metadata.
+- **Prompt caching** — `cache: {key, ttl}` option on requests. `anymodel._cache` exports `create_prompt_cache_key()` (stable, deterministic key from arbitrary structured inputs) and `with_prompt_cache()`. Wired into OpenAI (`prompt_cache_key`/`prompt_cache_retention`), Anthropic (`cache_control`), and xAI (`prompt_cache_key`).
+- **OpenAI Responses API support for reasoning models** — set `reasoning: {effort}` on a request to route it through `/v1/responses`. The OpenAI adapter translates the common tool-call contract to/from Responses function-call items, so callers can run a full reasoning + tool-call loop without a separate SDK. Existing requests without `reasoning` are unaffected.
+- **`calculate_provider_cost()`** — normalized, provider-aware cost accounting that replaces flat batch cost calculation. Accounts for cache read/write tokens separately from uncached prompt tokens, and treats OpenAI Flex/native-batch discounts as OpenAI-specific pricing policy (`anymodel.pricing._provider_policy`) rather than a generic 50% multiplier applied to every provider — fixes a bug where non-OpenAI providers with `service_tier: "flex"` incorrectly received the discount.
+- `calculate_cost()` now accepts optional `cache_read_tokens`/`cache_write_tokens`, billed at each model's generated `cache_read`/`cache_write` rates when available.
+- Anthropic and Google adapters now filter tool lists to function-type tools only, matching the Node.js SDK's defensive handling of mixed tool lists.
+
 ## [0.8.0] - 2026-03-30
 
 ### Added

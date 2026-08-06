@@ -85,7 +85,9 @@ def generate_source(pricing: dict[str, dict[str, float]]) -> str:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any
+
+from anymodel.pricing._provider_policy import PricingMode, provider_pricing_multiplier
 
 
 # Date this pricing data was fetched
@@ -101,7 +103,7 @@ MODEL_PRICING: dict[str, dict[str, float]] = {{
 }}
 
 
-def get_model_pricing(model_id: str) -> Optional[dict[str, float]]:
+def get_model_pricing(model_id: str) -> dict[str, float] | None:
     """
     Look up pricing for a model. Tries exact match first,
     then falls back to prefix matching for versioned models.
@@ -122,12 +124,48 @@ def calculate_cost(
     model_id: str,
     prompt_tokens: int,
     completion_tokens: int,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> float:
-    """Calculate the cost for a request given token counts."""
+    """Calculate the cost for a request given token counts, including cache reads/writes."""
     pricing = get_model_pricing(model_id)
     if not pricing:
         return 0.0
-    return (prompt_tokens * pricing["prompt"]) + (completion_tokens * pricing["completion"])
+    cached_tokens = cache_read_tokens + cache_write_tokens
+    uncached_prompt_tokens = max(0, prompt_tokens - cached_tokens)
+    return (
+        (uncached_prompt_tokens * pricing["prompt"])
+        + (cache_read_tokens * pricing.get("cache_read", pricing["prompt"]))
+        + (cache_write_tokens * pricing.get("cache_write", pricing["prompt"]))
+        + (completion_tokens * pricing["completion"])
+    )
+
+
+def calculate_provider_cost(
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    *,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+    service_tier: str | None = None,
+    batch_mode: str | None = None,
+) -> dict[str, Any]:
+    """Normalized, provider-aware cost record.
+
+    Treats OpenAI Flex/native-batch discounts as OpenAI-specific policy rather
+    than a generic 50% multiplier applied to every provider.
+    """
+    pricing = get_model_pricing(model)
+    provider = model.split("/", 1)[0]
+    mode: PricingMode = (
+        "native_batch" if batch_mode == "native"
+        else "flex" if service_tier == "flex"
+        else "standard"
+    )
+    multiplier = provider_pricing_multiplier(provider, mode)
+    cost = calculate_cost(model, prompt_tokens, completion_tokens, cache_read_tokens, cache_write_tokens) * multiplier
+    return {{"estimated_cost": cost, "multiplier": multiplier, "pricing": pricing}}
 '''
 
 

@@ -151,17 +151,19 @@ class GoogleAdapter:
         if gen_config:
             body["generationConfig"] = gen_config
 
-        # Tools
+        # Tools — Google only understands function tools
         tools = request.get("tools")
         if tools:
-            body["tools"] = [{"functionDeclarations": [
-                {
-                    "name": t["function"]["name"],
-                    "description": t["function"].get("description", ""),
-                    "parameters": t["function"].get("parameters", {"type": "object", "properties": {}}),
-                }
-                for t in tools
-            ]}]
+            function_tools = [t for t in tools if t.get("type") == "function"]
+            if function_tools:
+                body["tools"] = [{"functionDeclarations": [
+                    {
+                        "name": t["function"]["name"],
+                        "description": t["function"].get("description", ""),
+                        "parameters": t["function"].get("parameters", {"type": "object", "properties": {}}),
+                    }
+                    for t in function_tools
+                ]}]
 
         return body
 

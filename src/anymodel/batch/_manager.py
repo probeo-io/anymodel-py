@@ -16,10 +16,12 @@ from anymodel.utils._id import generate_id
 from anymodel.utils._model_parser import parse_model_string
 
 try:
-    from anymodel.generated.pricing import calculate_cost as _calculate_cost
+    from anymodel.generated.pricing import calculate_provider_cost as _calculate_provider_cost
 except ImportError:
-    def _calculate_cost(model_id: str, prompt_tokens: int, completion_tokens: int) -> float:  # type: ignore[misc]
-        return 0.0
+    def _calculate_provider_cost(  # type: ignore[misc]
+        model: str, prompt_tokens: int, completion_tokens: int, **kwargs: Any,
+    ) -> dict[str, Any]:
+        return {"estimated_cost": 0.0, "multiplier": 1.0, "pricing": None}
 
 
 class BatchManager:
@@ -57,18 +59,16 @@ class BatchManager:
         return self._batch_adapters.get(parsed.provider)
 
     @staticmethod
-    def _batch_discount(batch: dict[str, Any]) -> float:
-        """Return the cost multiplier for a batch.
-
-        - native batches: 0.5 (50% off)
-        - concurrent + flex: 0.5
-        - concurrent + auto/None: 1.0
-        """
-        if batch.get("batch_mode") == "native":
-            return 0.5
-        if batch.get("service_tier") == "flex":
-            return 0.5
-        return 1.0
+    def _batch_cost(batch: dict[str, Any], usage: dict[str, Any]) -> float:
+        """Return the normalized, provider-aware estimated cost for a batch."""
+        cost: float = _calculate_provider_cost(
+            batch["model"],
+            usage["total_prompt_tokens"],
+            usage["total_completion_tokens"],
+            service_tier=batch.get("service_tier"),
+            batch_mode=batch.get("batch_mode"),
+        )["estimated_cost"]
+        return cost
 
     async def create(self, request: dict[str, Any]) -> dict[str, Any]:
         """Create a batch. Routes to native or concurrent processing."""
@@ -173,11 +173,7 @@ class BatchManager:
                     if resp and resp.get("usage"):
                         usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                         usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
-                usage["estimated_cost"] = _calculate_cost(
-                    batch["model"],
-                    usage["total_prompt_tokens"],
-                    usage["total_completion_tokens"],
-                ) * self._batch_discount(batch)
+                usage["estimated_cost"] = self._batch_cost(batch, usage)
                 return {
                     "id": batch_id,
                     "status": batch["status"],
@@ -214,11 +210,7 @@ class BatchManager:
             if resp and resp.get("usage"):
                 usage["total_prompt_tokens"] += resp["usage"].get("prompt_tokens", 0)
                 usage["total_completion_tokens"] += resp["usage"].get("completion_tokens", 0)
-        usage["estimated_cost"] = _calculate_cost(
-            batch["model"],
-            usage["total_prompt_tokens"],
-            usage["total_completion_tokens"],
-        ) * self._batch_discount(batch)
+        usage["estimated_cost"] = self._batch_cost(batch, usage)
 
         return {
             "id": batch_id,

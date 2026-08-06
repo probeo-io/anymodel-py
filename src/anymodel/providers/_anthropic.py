@@ -19,7 +19,7 @@ DEFAULT_MAX_TOKENS = 4096
 
 SUPPORTED_PARAMS = frozenset({
     "temperature", "max_tokens", "top_p", "top_k", "stop", "stream",
-    "tools", "tool_choice", "response_format",
+    "tools", "tool_choice", "response_format", "cache",
 })
 
 FALLBACK_MODELS: list[dict[str, Any]] = [
@@ -114,17 +114,28 @@ class AnthropicAdapter:
         if request.get("stream"):
             body["stream"] = True
 
-        # Map tools
+        # Prompt caching
+        cache = request.get("cache")
+        if cache:
+            body["cache_control"] = {
+                "type": "ephemeral",
+                **({"ttl": "1h"} if cache.get("ttl") in ("1h", "24h") else {}),
+            }
+
+        # Map tools — Anthropic only understands function tools
         tools = request.get("tools")
         if tools:
+            function_tools = [t for t in tools if t.get("type") == "function"]
             body["tools"] = [
                 {
                     "name": t["function"]["name"],
                     "description": t["function"].get("description", ""),
                     "input_schema": t["function"].get("parameters", {"type": "object", "properties": {}}),
                 }
-                for t in tools
+                for t in function_tools
             ]
+            if not function_tools:
+                del body["tools"]
 
             tool_choice = request.get("tool_choice")
             if tool_choice == "auto":
@@ -132,7 +143,7 @@ class AnthropicAdapter:
             elif tool_choice == "required":
                 body["tool_choice"] = {"type": "any"}
             elif tool_choice == "none":
-                del body["tools"]
+                body.pop("tools", None)
             elif isinstance(tool_choice, dict):
                 body["tool_choice"] = {"type": "tool", "name": tool_choice["function"]["name"]}
 

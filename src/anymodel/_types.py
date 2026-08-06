@@ -64,6 +64,21 @@ class ToolChoiceObject(TypedDict):
 
 ToolChoice = Literal["none", "auto", "required"] | ToolChoiceObject
 
+# ─── Prompt Caching ──────────────────────────────────────────────────────────
+
+
+class PromptCacheOptions(TypedDict, total=False):
+    key: str
+    ttl: Literal["5m", "1h", "24h"]
+
+
+# ─── Reasoning ───────────────────────────────────────────────────────────────
+
+
+class ReasoningOptions(TypedDict, total=False):
+    effort: Literal["none", "low", "medium", "high", "xhigh", "max"]
+
+
 # ─── Response Format ─────────────────────────────────────────────────────────
 
 
@@ -121,6 +136,9 @@ class ChatCompletionRequest(TypedDict, total=False):
     tools: list[Tool]
     tool_choice: ToolChoice
     user: str
+    service_tier: Literal["auto", "flex"]
+    cache: PromptCacheOptions
+    reasoning: ReasoningOptions
     # Anymodel-specific
     models: list[str]
     route: Literal["fallback"]
@@ -259,6 +277,8 @@ class BatchRequestItem(TypedDict, total=False):
     response_format: ResponseFormat
     tools: list[Tool]
     tool_choice: ToolChoice
+    service_tier: Literal["auto", "flex"]
+    cache: PromptCacheOptions
 
 
 class BatchCreateOptions(TypedDict, total=False):
@@ -270,6 +290,8 @@ class BatchCreateOptions(TypedDict, total=False):
     response_format: ResponseFormat
     tools: list[Tool]
     tool_choice: ToolChoice
+    service_tier: Literal["auto", "flex"]
+    cache: PromptCacheOptions
 
 
 class BatchCreateRequest(TypedDict, total=False):
